@@ -1,9 +1,10 @@
 import numpy as np
 import tomllib
 
-G0 = 9.80665            # [m/s^2], gravitational constant
-HP2KW = 0.745699872     # [kW/HP], conversion factor HP to kW
-FUEL_DENSITY = 720.0    # [kg/m^3], density of 100LL avgas
+G0 = 9.80665                # [m/s^2], gravitational constant
+HP2KW = 0.745699872         # [kW/HP], conversion factor HP to kW
+FUEL_DENSITY = 720.0        # [kg/m^3], density of 100LL avgas
+RPM_TO_OMEGA = 2*np.pi/60   # Conversion from rpm to angular velocity omega [rad/s]
 # -----------------------------------------------------
 class Location(np.ndarray):
     def __new__(cls, x: float, y: float, z: float):
@@ -154,3 +155,30 @@ class Aircraft:
         self.CMde = a["CMde"]
         self.dCM_flaps = np.asarray([a["dCM_flaps"]["flap_deg"],
                                      a["dCM_flaps"]["dCM_flap"]], dtype = float)
+        
+        # post config loading attributes
+        self.total_mass = self.EOM + sum([pm.mass for pm in self.point_masses]) + sum([ft.mass for ft in self.fuel_tanks])      # [kg], mass at the start of a simulation
+    
+    def get_current_mass(self, d_mass: float):
+        self.total_mass -= d_mass
+    
+    def get_current_cg(self) -> Location:
+        cg_mass_product = self.empty_cg * self.EOM
+        for pm in self.point_masses:
+            cg_mass_product += pm.location * pm.mass
+        for ft in self.fuel_tanks:
+            cg_mass_product += ft.location * ft.mass
+        cg = cg_mass_product / self.total_mass
+        self.cg = Location(cg[0], cg[1], cg[2])
+
+    def get_current_engine_power(self, throttle_setting: float) -> float:
+        if not self.engine_throttle_range[0] <= throttle_setting <= self.engine_throttle_range[1]:
+            raise ValueError("Throttle setting is outside of the permitted range")
+        P_eng = throttle_setting * self.engine_max_power
+        return P_eng
+    
+    def calculate_thrust_coefficient(self, J: float, clamp: bool = True) -> float:
+        J_grid, cT = self.prop_cT_curve
+        if clamp:
+            J = np.clip(J, J_grid[0], J_grid[-1])
+        return np.interp(J, J_grid, cT)
