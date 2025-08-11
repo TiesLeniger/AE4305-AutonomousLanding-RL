@@ -124,8 +124,9 @@ class Aircraft:
                                              ft["location"]["y"],
                                              ft["location"]["z"])) for ft in pr["fuel_tank"]]
         
-        # Aerodynamics
+        ## Aerodynamics
         a = raw["aerodynamics"]
+        # Lift
         self.CL_alpha_curve = np.asarray([a["CL_curve"]["alpha"],
                                           a["CL_curve"]["CL"]], dtype = float)
         self.dCL_flaps = np.asarray([a["dCL_flaps"]["flap_deg"],
@@ -135,6 +136,7 @@ class Aircraft:
         self.CLq = a["CLq"]
         self.ground_effect_lift_curve = np.asarray([a["ground_effect_lift"]["h_b"],
                                                     a["ground_effect_lift"]["lift_multiplier"]], dtype = float)
+        # Drag
         self.CD0 = a["CD0"]
         self.CDde = a["CDde"]
         self.CD_alpha_curve = np.asarray([a["CD_curve"]["alpha"],
@@ -144,6 +146,11 @@ class Aircraft:
                                           a["CD_curve"]["CD_flap30"]], dtype = float)
         self.ground_effect_drag_curve = np.asarray([a["ground_effect_drag"]["h_b"],
                                                     a["ground_effect_drag"]["lift_multiplier"]], dtype = float)
-        
-        
-        
+        # Pitching moment
+        self.CM0 = a["CM0"]
+        self.CMa = a["CMa"]
+        self.CMq = a["CMq"]
+        self.CMadot = a["CMadot"]
+        CMde = a["CMde"]
+        self.dCM_flaps = np.asarray([a["dCM_flaps"]["flap_deg"],
+                                     a["dCM_flaps"]["dCM_flap"]], dtype = float)
