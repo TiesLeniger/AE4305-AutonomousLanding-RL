@@ -143,4 +143,4 @@ CMadot = -5.2       # [1/rad/s], pitching moment slope with rate of change of an
 CMde = -1.28        # [1/rad], pitching moment slope with elevator deflection
 [aerodynamics.dCM_flaps] # Change in pitching moment due to flap deflection
 flap_deg = [0.0, 10.0, 20.0, 30.0]
-CMdf = [0.0, -0.03, -0.05, -0.06]
+dCM_flap = [0.0, -0.03, -0.05, -0.06]
