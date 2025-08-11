@@ -9,14 +9,14 @@ c_bar = 1.49                # [m], mean chord
 
 [mass_balance]
 empty_mass = 660.0          # [kg], empty operating weight
-iyy = 1825.0
+iyy = 1825.0                # [kg m^2]
 
 [mass_balance.empty_cg]     # x, y and z of the empty aircraft cg in [m]
 x = 1.04
 y = 0.0
 z = 0.93
 
-# Point masses in the aircaft
+# Point masses in the aircraft
 [[mass_balance.pointmasses]]
 name = "pilot"
 mass = 85.0                         # [kg], pilot reference mass
@@ -42,7 +42,7 @@ y = -0.36
 z = 0.61
 
 [[mass_balance.pointmasses]]
-name = "passenger 1"
+name = "passenger 2"
 mass = 70.0                         # [kg], passenger mass
 [mass_balance.pointmasses.location] # x, y and z in [m]
 x = 1.52
@@ -103,7 +103,7 @@ CLq = 3.9               # [1/rad/s], lift due to aircraft pitch rate
 
 [aerodynamics.CL_curve]     # CL-alpha curve for the wing, body and horizontal stabilizer
 alpha = [-0.09, 0.0, 0.09, 0.1, 0.12, 0.14, 0.16, 0.17, 0.19, 0.21, 0.24, 0.26, 0.28, 0.30, 0.32, 0.34, 0.36]   # angle of attack in rad
-CL = [-0.22, 0.25, 0.73, 0.83, 0.92, 1.02, 1.08, 1.13, 1.19, 1.25, 1.35, 1.44, 1.47, 1.43, 1.38, 1.30]          # CL of aircraft (wing, body, horizontal tail)
+CL = [-0.22, 0.25, 0.73, 0.83, 0.92, 1.02, 1.08, 1.13, 1.19, 1.25, 1.35, 1.44, 1.47, 1.43, 1.38, 1.30, 1.15]    # CL of aircraft (wing, body, horizontal tail)
 
 [aerodynamics.dCL_flaps]    # Lift due to flap deflection
 flap_deg = [0.0, 10.0, 20.0, 30.0]
@@ -116,7 +116,7 @@ lift_multiplier = [1.203, 1.127, 1.090, 1.073, 1.046, 1.028, 1.019, 1.013, 1.008
 CD0 = 0.032             # [-], zero lift drag coefficient
 CDde = 0.06             # [1/rad], drag due to elevator deflection
 
-[aerodynamics.CD_curve] # CD-alpha relation for clean configuration, 10, 20 and 30 degrees of flapos
+[aerodynamics.CD_curve] # CD-alpha relation for clean configuration, 10, 20 and 30 degrees of flaps
 alpha = [-0.0872664, -0.0698132, -0.0523599, -0.0349066, -0.0174533, 0.0, 0.0174533, 0.0349066, 0.0523599, 0.0698132, 0.0872664, 0.10472, 0.122173, 0.139626, 0.15708,
      0.174533, 0.191986, 0.209439, 0.226893, 0.244346, 0.261799, 0.279253, 0.296706, 0.314159, 0.331613, 0.349066]
 
@@ -141,6 +141,6 @@ CMa = -1.8          # [1/rad], pitching moment slope with alpha
 CMq = -12.4         # [1/rad/s], pitching moment slope with pitch rate
 CMadot = -5.2       # [1/rad/s], pitching moment slope with rate of change of angle of attack
 CMde = -1.28        # [1/rad], pitching moment slope with elevator deflection
-[aerodynamics.CMdf] # Change in pitching moment due to flap deflection
+[aerodynamics.dCM_flaps] # Change in pitching moment due to flap deflection
 flap_deg = [0.0, 10.0, 20.0, 30.0]
 CMdf = [0.0, -0.03, -0.05, -0.06]
