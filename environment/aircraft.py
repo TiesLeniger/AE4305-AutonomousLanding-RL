@@ -2,7 +2,7 @@ import numpy as np
 import tomllib
 
 G0 = 9.80665            # [m/s^2], gravitational constant
-HP2KW = 0.745699872     # [KW/HP], conversion factor HP to KW
+HP2KW = 0.745699872     # [kW/HP], conversion factor HP to kW
 FUEL_DENSITY = 720.0    # [kg/m^3], density of 100LL avgas
 # -----------------------------------------------------
 class Location(np.ndarray):
@@ -56,8 +56,7 @@ class FuelTank:
         self.capacity = capacity
         if fill_level <= 0.0 or fill_level > 1.0:
             raise ValueError(f"Fuel tank fill level must be larger than 0.0 and smaller than or equal to 1.0, got {fill_level}")
-        else:
-            self.fill_level = fill_level
+        self.fill_level = fill_level
         self.location = location
 
     def __repr__(self):
@@ -72,7 +71,7 @@ class FuelTank:
         return self.mass * G0
     
     @property
-    def fuel_volume(self) -> float:
+    def fuel_volume_litres(self) -> float:
         return (self.mass*1000)/FUEL_DENSITY
     
     def moment_about(self, point: Location) -> np.ndarray:
@@ -94,7 +93,7 @@ class Aircraft:
         # Mass and balance
         mb = raw["mass_balance"]
         self.EOM = mb["empty_mass"]                     # [kg], empty operating mass
-        self.Iyy = mb["Iyy"]                            # [kg m^2], pitch axis moment of inertia of the aircraft
+        self.Iyy = mb["iyy"]                            # [kg m^2], pitch axis moment of inertia of the aircraft
         self.empty_cg = Location(mb["empty_cg"]["x"],
                                  mb["empty_cg"]["y"],
                                  mb["empty_cg"]["z"])   # [m], x, y and z location of the empty cg
@@ -106,23 +105,24 @@ class Aircraft:
                                                 pm["location"]["z"])) for pm in pm_list]
         
         # Propulsion
-        pr = raw["propulsion"]
-        self.engine_max_power = pr["max_power"] * HP2KW
-        self.engine_bsfc = pr["bsfc"]
-        self.engine_rpm_range = (550.0, 2700.0)
-        self.engine_throttle_range = (0.1, 1.0)
-        self.engine_mech_drag = pr["propeller"]["k_mech"]
-        self.prop_ixx = pr["propeller"]["ixx"]
-        self.prop_diameter = pr["propeller"]["diameter"]
-        self.prop_cT_curve = np.asarray([pr["propeller"]["ct_curve"]["J"],
-                                         pr["propeller"]["ct_curve"]["Ct"]], dtype = float)
-        self.prop_cP_curve = np.asarray([pr["propeller"]["cp_curve"]["J"],
-                                         pr["propeller"]["cp_curve"]["Cp"]], dtype = float)
+        eng = raw["propulsion"]["engine"]
+        self.engine_max_power = eng["max_power"] * HP2KW
+        self.engine_bsfc = eng["bsfc"]
+        self.engine_rpm_range = (eng["idle_rpm"], eng["max_rpm"])
+        self.engine_throttle_range = (eng["min_throttle"], eng["max_throttle"])
+        self.engine_mech_drag = eng["k_mech"]
+        prop = raw["propulsion"]["propeller"]
+        self.prop_ixx = prop["ixx"]
+        self.prop_diameter = prop["diameter"]
+        self.prop_cT_curve = np.asarray([prop["ct_curve"]["J"],
+                                         prop["ct_curve"]["Ct"]], dtype = float)
+        self.prop_cP_curve = np.asarray([prop["cp_curve"]["J"],
+                                         prop["cp_curve"]["Cp"]], dtype = float)
         self.fuel_tanks = [FuelTank(ft["capacity"],
                                     ft["fill_level"],
                                     Location(ft["location"]["x"],
                                              ft["location"]["y"],
-                                             ft["location"]["z"])) for ft in pr["fuel_tank"]]
+                                             ft["location"]["z"])) for ft in raw["propulsion"]["fuel_tank"]]
         
         ## Aerodynamics
         a = raw["aerodynamics"]
@@ -145,12 +145,12 @@ class Aircraft:
                                           a["CD_curve"]["CD_flap20"],
                                           a["CD_curve"]["CD_flap30"]], dtype = float)
         self.ground_effect_drag_curve = np.asarray([a["ground_effect_drag"]["h_b"],
-                                                    a["ground_effect_drag"]["lift_multiplier"]], dtype = float)
+                                                    a["ground_effect_drag"]["drag_multiplier"]], dtype = float)
         # Pitching moment
         self.CM0 = a["CM0"]
         self.CMa = a["CMa"]
         self.CMq = a["CMq"]
         self.CMadot = a["CMadot"]
-        CMde = a["CMde"]
+        self.CMde = a["CMde"]
         self.dCM_flaps = np.asarray([a["dCM_flaps"]["flap_deg"],
                                      a["dCM_flaps"]["dCM_flap"]], dtype = float)
