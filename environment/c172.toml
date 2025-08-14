@@ -8,6 +8,7 @@ wing_span = 10.97           # [m], main wing span
 c_bar = 1.49                # [m], mean chord
 
 [mass_balance]
+mtom = 1157.0               # [kg], max take-off mass
 empty_mass = 660.0          # [kg], empty operating weight
 iyy = 1825.0                # [kg m^2]
 

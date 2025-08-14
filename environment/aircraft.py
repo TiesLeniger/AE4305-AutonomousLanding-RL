@@ -93,6 +93,7 @@ class Aircraft:
 
         # Mass and balance
         mb = raw["mass_balance"]
+        self.MTOM = mb["mtom"]                          # [kg], max take-off mass
         self.EOM = mb["empty_mass"]                     # [kg], empty operating mass
         self.Iyy = mb["iyy"]                            # [kg m^2], pitch axis moment of inertia of the aircraft
         self.empty_cg = Location(mb["empty_cg"]["x"],
@@ -127,10 +128,11 @@ class Aircraft:
         
         ## Aerodynamics
         a = raw["aerodynamics"]
+        self.flap_settings = np.asarray(a["dCL_flaps"]["flap_deg"], dtype = float)
         # Lift
         self.CL_alpha_curve = np.asarray([a["CL_curve"]["alpha"],
                                           a["CL_curve"]["CL"]], dtype = float)
-        self.dCL_flaps = np.asarray([a["dCL_flaps"]["flap_deg"],
+        self.dCL_flaps = np.asarray([self.flap_settings,
                                      a["dCL_flaps"]["dCL_flap"]], dtype = float)
         self.CLde = a["CLde"]
         self.CLadot = a["CLadot"]
@@ -153,16 +155,27 @@ class Aircraft:
         self.CMq = a["CMq"]
         self.CMadot = a["CMadot"]
         self.CMde = a["CMde"]
-        self.dCM_flaps = np.asarray([a["dCM_flaps"]["flap_deg"],
+        self.dCM_flaps = np.asarray([self.flap_settings,
                                      a["dCM_flaps"]["dCM_flap"]], dtype = float)
         
         # post config loading attributes
-        self.total_mass = self.EOM + sum([pm.mass for pm in self.point_masses]) + sum([ft.mass for ft in self.fuel_tanks])      # [kg], mass at the start of a simulation
+        self.total_mass = self._evaluate_total_mass()
+        if self.total_mass > self.MTOM:
+            print(f"Warning: maximum take-off mass exceeded (mass: {self.total_mass:.1f} [kg], max allowed: {self.MTOM:.1f} [kg]). Reducing pax/luggage weight")
+            order = ["luggage", "passenger 2", "passenger 1", "co-pilot"]
+            i = 0
+            while self.total_mass > self.MTOM:
+                self.point_masses = [pm for pm in self.point_masses if pm.name != order[i]]
+                self.total_mass = self._evaluate_total_mass()
+                i += 1
+
+    def _evaluate_total_mass(self) -> float:
+        return self.EOM + sum([pm.mass for pm in self.point_masses]) + sum([ft.mass for ft in self.fuel_tanks])
     
-    def get_current_mass(self, d_mass: float):
+    def update_total_mass(self, d_mass: float):
         self.total_mass -= d_mass
     
-    def get_current_cg(self) -> Location:
+    def calculate_current_cg(self) -> Location:
         cg_mass_product = self.empty_cg * self.EOM
         for pm in self.point_masses:
             cg_mass_product += pm.location * pm.mass
@@ -170,6 +183,7 @@ class Aircraft:
             cg_mass_product += ft.location * ft.mass
         cg = cg_mass_product / self.total_mass
         self.cg = Location(cg[0], cg[1], cg[2])
+        return self.cg
 
     def get_current_engine_power(self, throttle_setting: float) -> float:
         if not self.engine_throttle_range[0] <= throttle_setting <= self.engine_throttle_range[1]:
@@ -182,3 +196,61 @@ class Aircraft:
         if clamp:
             J = np.clip(J, J_grid[0], J_grid[-1])
         return np.interp(J, J_grid, cT)
+    
+    def calculate_power_coefficient(self, J: float, clamp: bool = True) -> float:
+        J_grid, Cp = self.prop_cP_curve
+        if clamp:
+            J = np.clip(J, J_grid[0], J_grid[-1])
+        return np.interp(J, J_grid, Cp)
+    
+    def calculate_CL_due_to_alpha(self, alpha: float, clamp: bool = True) -> float:
+        alpha_grid, CL = self.CL_alpha_curve
+        if clamp:
+            alpha = np.clip(alpha, alpha_grid[0], alpha_grid[-1])
+        return np.interp(alpha, alpha_grid, CL)
+    
+    def get_CL_due_to_flaps(self, flap_setting_deg: float) -> float:
+        flap_idx = np.nonzero(np.isclose(self.flap_settings, flap_setting_deg))[0]
+        if flap_idx.size == 0:
+            raise ValueError(f"Flap {flap_setting_deg}° not in {self.flap_settings.tolist()}")
+        flap_idx = int(flap_idx[0])
+        return float(self.dCL_flaps[1, flap_idx])
+    
+    def calculate_CD_due_to_alpha(self, alpha: float, flap_setting_deg: float, clamp: bool = True) -> float:
+        flap_idx = np.nonzero(np.isclose(self.flap_settings, flap_setting_deg))[0]
+        if flap_idx.size == 0:
+            raise ValueError(f"Flap {flap_setting_deg}° not in {self.flap_settings.tolist()}")
+        flap_idx = int(flap_idx[0])
+        alpha_grid, CD = self.CD_alpha_curve[0], self.CD_alpha_curve[flap_idx + 1]
+        if clamp:
+            alpha = np.clip(alpha, alpha_grid[0], alpha_grid[-1])
+        return np.interp(alpha, alpha_grid, CD)
+    
+    def calculate_ground_effect_lift_factor(self, h: float, num_tol: float = 1e-6) -> float:
+        h_b = h / self.b
+        if h_b < 0.0:
+            raise ValueError(f"Negative altitude encountered: {h:.2f} [m]")
+        elif h_b > self.ground_effect_lift_curve[0, -1]:
+            return 1.0
+        elif h_b < num_tol:
+            return self.ground_effect_lift_curve[1, 0]
+        else:
+            return np.interp(h_b, self.ground_effect_lift_curve[0], self.ground_effect_lift_curve[1])
+
+    def calculate_ground_effect_drag_factor(self, h: float, num_tol: float = 1e-6) -> float:
+        h_b = h / self.b
+        if h_b < 0.0:
+            raise ValueError(f"Negative altitude encountered: {h:.2f} [m]")
+        elif h_b > self.ground_effect_drag_curve[0, -1]:
+            return 1.0
+        elif h_b < num_tol:
+            return self.ground_effect_drag_curve[1, 0]
+        else:
+            return np.interp(h_b, self.ground_effect_drag_curve[0], self.ground_effect_drag_curve[1])
+        
+    def get_CM_due_to_flaps(self, flap_setting_deg: float) -> float:
+        flap_idx = np.nonzero(np.isclose(self.flap_settings, flap_setting_deg))[0]
+        if flap_idx.size == 0:
+            raise ValueError(f"Flap {flap_setting_deg}° not in {self.flap_settings.tolist()}")
+        flap_idx = int(flap_idx[0])
+        return float(self.dCM_flaps[1, flap_idx])
